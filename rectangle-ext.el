@@ -4,6 +4,7 @@
 ;; URL: https://github.com/noctuid/rectangle-ext.el
 ;; Created: November 15, 2016
 ;; Keywords: rectangle
+;; Package-Requires: ((cl-lib "0.5") (emacs "24.4"))
 ;; Version: 0.1
 
 ;; This file is not part of GNU Emacs.
@@ -29,6 +30,7 @@
 
 ;;; Code:
 ;; (require 'rect)
+(require 'cl-lib)
 
 (defgroup rectangle-ext nil
   "Provides extensions to rect.el such as a narrowing command for rectangles."
@@ -39,7 +41,7 @@
 (defvar-local rectangle-ext--original-buffer nil)
 (defvar-local rectangle-ext--beg nil)
 (defvar-local rectangle-ext--end nil)
-(defvar rectangle-ext--replace-string nil)
+(defvar rectangle-ext--replace-lines nil)
 
 (defun rectangle-ext-narrow (beg end)
   "Simulate `narrow-to-region' for a rectangular selection.
@@ -65,7 +67,7 @@ The next item in `rectangle-ext--replace-string' will be used as the replacement
 text."
   (move-to-column startcol t)
   (delete-rectangle-line startcol endcol nil)
-  (insert (pop rectangle-ext--replace-string)))
+  (insert (pop rectangle-ext--replace-lines)))
 
 (defun rectangle-ext-widen ()
   "Widen the currently narrowed rectangle."
@@ -78,8 +80,33 @@ text."
       (kill-this-buffer)
       (switch-to-buffer buffer)
       (setq rectangle-ext--narrowed-p nil)
-      (setq rectangle-ext--replace-string (split-string text "\n+"))
+      (setq rectangle-ext--replace-lines (split-string text "\n+"))
       (apply-on-rectangle #'rectangle-ext--replace-line beg end))))
+
+(with-eval-after-load 'evil
+  (defmacro rectangle-ext-with-restriction (beg end &rest body)
+    "For the rectangle delimited by BEG and END, execute BODY."
+    (declare (indent 2))
+    (let ((rect-lines (cl-gensym)))
+      `(let ((,rect-lines (extract-rectangle ,beg ,end)))
+         (with-temp-buffer
+           (dolist (line ,rect-lines)
+             (insert line)
+             (insert "\n"))
+           ,@body
+           (setq rectangle-ext--replace-lines
+                 (split-string (buffer-string) "\n+")))
+         (apply-on-rectangle #'rectangle-ext--replace-line ,beg ,end))))
+
+  (evil-define-command rectangle-ext-evil-rectangle (beg end command-string)
+    "Alter a rectangular selection with an evil ex command.
+For the rectangle delimited by BEG and END, execute the evil ex COMMAND-STRING."
+    (interactive "<r><a>")
+    (rectangle-ext-with-restriction beg end
+      (let ((evil-ex-current-buffer (current-buffer)))
+        (evil-ex-execute (concat "%" command-string)))))
+
+  (evil-ex-define-cmd "B" #'rectangle-ext-evil-rectangle))
 
 (provide 'rectangle-ext)
 ;;; rectangle-ext.el ends here
