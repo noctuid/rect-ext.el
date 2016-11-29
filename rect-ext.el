@@ -83,28 +83,28 @@ text."
       (setq rect-ext--replace-lines (split-string text "\n+"))
       (apply-on-rectangle #'rect-ext--replace-line beg end))))
 
-(with-eval-after-load 'evil
-  (defmacro rect-ext-with-restriction (beg end &rest body)
-    "For the rectangle delimited by BEG and END, execute BODY."
-    (declare (indent 2))
-    (let ((rect-lines (cl-gensym)))
-      `(let ((,rect-lines (extract-rectangle ,beg ,end)))
-         (with-temp-buffer
-           (dolist (line ,rect-lines)
-             (insert line)
-             (insert "\n"))
-           ,@body
-           (setq rect-ext--replace-lines
-                 (split-string (buffer-string) "\n+")))
-         (apply-on-rectangle #'rect-ext--replace-line ,beg ,end))))
+(defmacro rect-ext-with-restriction (beg end &rest body)
+  "For the rectangle delimited by BEG and END, execute BODY."
+  (declare (indent 2))
+  (let ((rect-lines (cl-gensym)))
+    `(let ((,rect-lines (extract-rectangle ,beg ,end)))
+       (with-temp-buffer
+         (dolist (line ,rect-lines)
+           (insert line)
+           (insert "\n"))
+         ,@body
+         (setq rect-ext--replace-lines
+               (split-string (buffer-string) "\n+")))
+       (apply-on-rectangle #'rect-ext--replace-line ,beg ,end))))
 
+(with-eval-after-load 'evil
   (evil-define-command rect-ext-evil-rectangle (beg end command-string)
     "Alter a rectangular selection with an evil ex command.
 For the rectangle delimited by BEG and END, execute the evil ex COMMAND-STRING."
     (interactive "<r><a>")
     (rect-ext-with-restriction beg end
-                               (let ((evil-ex-current-buffer (current-buffer)))
-                                 (evil-ex-execute (concat "%" command-string)))))
+      (let ((evil-ex-current-buffer (current-buffer)))
+        (evil-ex-execute (concat "%" command-string)))))
 
   (evil-ex-define-cmd "B" #'rect-ext-evil-rectangle))
 
