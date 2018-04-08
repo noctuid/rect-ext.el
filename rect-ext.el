@@ -35,7 +35,7 @@
 (defgroup rect-ext nil
   "Provides extensions to rect.el such as a narrowing command for rectangles."
   :group 'convenience
-  :prefix 'rect-ext-)
+  :prefix "rect-ext-")
 
 (defvar-local rect-ext--narrowed-p nil)
 (defvar-local rect-ext--original-buffer nil)
