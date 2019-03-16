@@ -1,4 +1,4 @@
-;;; rect-ext.el --- Extensions to rect.el. -*- lexical-binding: t -*-
+;;; rect-ext.el --- Add narrowing commands for rectangles. -*- lexical-binding: t -*-
 
 ;; Author: Fox Kiester <noct@openmailbox.org>
 ;; URL: https://github.com/noctuid/rect-ext.el
@@ -43,6 +43,7 @@
 (defvar-local rect-ext--end nil)
 (defvar rect-ext--replace-lines nil)
 
+;;;###autoload
 (defun rect-ext-narrow (beg end)
   "Simulate `narrow-to-region' for a rectangular selection.
 BEG and END are the bounds of the rectangle and will default to the region
@@ -65,10 +66,12 @@ beginning and end."
   "Replace the region from STARTCOL to ENDCOL.
 The next item in `rect-ext--replace-string' will be used as the replacement
 text."
+  ;; TODO is force really necessary?
   (move-to-column startcol t)
   (delete-rectangle-line startcol endcol nil)
   (insert (pop rect-ext--replace-lines)))
 
+;;;###autoload
 (defun rect-ext-widen ()
   "Widen the currently narrowed rectangle."
   (interactive)
@@ -85,7 +88,7 @@ text."
 
 (defmacro rect-ext-with-restriction (beg end &rest body)
   "For the rectangle delimited by BEG and END, execute BODY."
-  (declare (indent 2))
+  (declare (indent 2) (debug t))
   (let ((rect-lines (cl-gensym)))
     `(let ((,rect-lines (extract-rectangle ,beg ,end)))
        (with-temp-buffer
@@ -104,9 +107,24 @@ For the rectangle delimited by BEG and END, execute the evil ex COMMAND-STRING."
     (interactive "<r><a>")
     (rect-ext-with-restriction beg end
       (let ((evil-ex-current-buffer (current-buffer)))
-        (evil-ex-execute (concat "%" command-string)))))
+        (evil-ex-execute (concat "%" command-string))))
+    ;; FIXME: Implement a more robust solution (see #5)
+    (delete-trailing-whitespace beg end))
 
-  (evil-ex-define-cmd "B" #'rect-ext-evil-rectangle))
+  (evil-ex-define-cmd "B" #'rect-ext-evil-rectangle)
+
+  (defun rect-ext-evil-ex ()
+    (interactive)
+    (if (and (evil-visual-state-p)
+             evil-ex-visual-char-range
+             (eq (evil-visual-type) 'block))
+        (evil-ex (concat "`<,`>B " evil-ex-initial-input))
+      (call-interactively #'evil-ex))))
+
+;;;###autoload
+(with-eval-after-load 'evil
+  (autoload 'rect-ext-evil-rectangle "rect-ext" nil t)
+  (autoload 'rect-ext-evil-ex "rect-ext" nil t))
 
 (provide 'rect-ext)
 ;;; rect-ext.el ends here
